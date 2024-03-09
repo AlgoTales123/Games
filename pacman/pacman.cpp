@@ -1,6 +1,8 @@
 #include <assert.h>
 #include <iostream>
 #include <vector>
+#include <chrono>
+#include <thread>
 using namespace std;
 
 class GameState;
@@ -166,23 +168,198 @@ public:
     }
   }
 
+  void ghostEncounter() {
+    Signal sig = killPacman();
+    if (sig == Signal::GameOver) {
+      assert(lives == 0 and "Game over signal while pacman is alive");
+      isAlive = false;
+      return;
+    }
+    isAlive = true;
+  }
+
+  void moveUpUtil(GameBoard &board, unsigned currRow) {
+    currRow -= 1;
+    board.updateCell(currRow, col, CellType::PacmanT);
+    board.updateCell(currRow + 1, col, CellType::EmptyT);
+    updatePosition(currRow, col);
+  }
+
+  void handleUpMovement(GameBoard &board) {
+    assert(pacLifeStatus() and "Pacman not live..");
+    unsigned currRow = row;
+    unsigned currCol = col;
+    if (currRow == 0)
+      return;
+    CellType entity = board.getEntityAt(currRow - 1, currCol);
+    switch (entity) {
+    // If entity is empty
+    case (CellType::EmptyT): {
+      moveUpUtil(board, currRow);
+      break;
+    }
+    case (CellType::WallT): {
+      break;
+    }
+    case (CellType::PalletT): {
+      score += 1;
+      moveUpUtil(board, currRow);
+      break;
+    }
+    case (CellType::PowerPalletT): {
+      score += 50;
+      moveUpUtil(board, currRow);
+      break;
+    }
+    case (CellType::GhostT): {
+      ghostEncounter();
+      break;
+    }
+    default:
+      assert("Unexpected upmovement request.");
+    }
+  }
+
+  void moveDownUtil(GameBoard &board, unsigned currRow) {
+    currRow += 1;
+    board.updateCell(currRow, col, CellType::PacmanT);
+    board.updateCell(currRow - 1, col, CellType::EmptyT);
+    updatePosition(currRow, col);
+  }
+
+  void handleDownMovement(GameBoard &board) {
+    assert(pacLifeStatus() and "Pacman not live..");
+    unsigned currRow = row;
+    unsigned currCol = col;
+    if (currCol == board.getRows() - 1)
+      return;
+    CellType entity = board.getEntityAt(currRow + 1, currCol);
+    switch (entity) {
+    case (CellType::EmptyT): {
+      moveDownUtil(board, currRow);
+      break;
+    }
+    case (CellType::WallT): {
+      break;
+    }
+    case (CellType::PalletT): {
+      score += 1;
+      moveDownUtil(board, currRow);
+      break;
+    }
+    case (CellType::PowerPalletT): {
+      score += 50;
+      moveDownUtil(board, currRow);
+      break;
+    }
+    case (CellType::GhostT): {
+      ghostEncounter();
+      break;
+    }
+    default:
+      assert("Unexpected  down movement request.");
+    }
+  }
+
+  void moveLeftUtil(GameBoard &board, unsigned currCol) {
+    currCol -= 1;
+    board.updateCell(row, currCol, CellType::PacmanT);
+    board.updateCell(row, currCol + 1, CellType::EmptyT);
+    updatePosition(row, currCol);
+  }
+
+  void handleLeftMovement(GameBoard &board) {
+    assert(pacLifeStatus() and "Pacman not live..");
+    unsigned currRow = row;
+    unsigned currCol = col;
+    if (currCol == 0)
+      return;
+    CellType entity = board.getEntityAt(currRow, currCol - 1);
+    switch (entity) {
+    case (CellType::EmptyT): {
+      moveLeftUtil(board, currCol);
+      break;
+    }
+    case (CellType::WallT): {
+      break;
+    }
+    case (CellType::PalletT): {
+      score += 1;
+      moveLeftUtil(board, currCol);
+      break;
+    }
+    case (CellType::PowerPalletT): {
+      score += 50;
+      moveLeftUtil(board, currCol);
+      break;
+    }
+    case (CellType::GhostT): {
+      ghostEncounter();
+      break;
+    }
+    default:
+      assert("Unexpected left movement request.");
+    }
+  }
+
+  void moveRightUtil(GameBoard &board,unsigned currCol){
+    currCol+=1;
+    board.updateCell(row,currCol,CellType::PacmanT);
+    board.updateCell(row,currCol - 1,CellType::EmptyT);
+    updatePosition(row,currCol);
+  }
+
+  void handleRightMovement(GameBoard &board){
+    assert(pacLifeStatus() and "Pacman not live..");
+    unsigned currRow = row;
+    unsigned currCol = col;
+    if(col==board.getCols()-1)
+        return;
+    CellType entity = board.getEntityAt(currRow,currCol+1);
+    switch(entity){
+        case(CellType::EmptyT):{
+            moveRightUtil(board,currCol);
+            break;
+        }
+        case(CellType::WallT):{
+            break;
+        }
+        case(CellType::PalletT):{
+            score+=1;
+            moveRightUtil(board,currCol);
+            break;
+        }
+        case(CellType::PowerPalletT):{
+            score+=50;
+            moveRightUtil(board,currCol);
+            break;
+        }
+        case(CellType::GhostT):{
+            ghostEncounter();
+            break;
+        }
+        default:
+            assert("Unexpected left movement request.");
+    }
+  }
+
   void move(GameState *state, Direction dir) {
     assert(state->pac->pacLifeStatus() and "Pacman not alive");
     switch (dir) {
     case (Direction::Up): {
-      handleUpMovement(state->board);
+      handleUpMovement(*state->board);
       break;
     }
     case (Direction::Down): {
-      handleDownMovement(state->board);
+      handleDownMovement(*state->board);
       break;
     }
     case (Direction::Left): {
-      handleLeftMovement(state->board);
+      handleLeftMovement(*state->board);
       break;
     }
     case (Direction::Right): {
-      handleRightMovement(state->board);
+      handleRightMovement(*state->board);
       break;
     }
     }
@@ -259,6 +436,40 @@ public:
     }
     board.renderBoard();
   }
+
+  void getAndProcessInput(){
+    char input;
+    cin>>input;
+    switch(input){
+        case('w'):{
+            state->pac->move(state,Direction::Up);
+            break;
+        }
+        case('s'):{
+            state->pac->move(state,Direction::Down);
+            break;
+        }
+        case('d'):{
+            state->pac->move(state,Direction::Right);
+            break;
+        }
+        case('a'):{
+            state->pac->move(state,Direction::Left);
+            break;
+        }
+        default:
+            cout<<"not a valid pacman move"<<"\n";
+    }
+  }
+
+  void runGame(){
+    trivalInitalState();
+    while(state->pac->pacLifeStatus()){
+        getAndProcessInput();
+        state->board->renderBoard();
+        this_thread::sleep_for(chrono::microseconds(100));
+    }
+  }
 };
 
 int main() {
@@ -268,5 +479,5 @@ int main() {
   vector<Ghost> ghosts = {Ghost(2, 1), Ghost(3, 4)};
   GameState *state = new GameState(board, pac, &ghosts);
   Game *game = new Game(state);
-  game->trivalInitalState();
+  game->runGame();
 }
